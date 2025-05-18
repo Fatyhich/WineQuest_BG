@@ -55,5 +55,20 @@ services:
       replicas: ${WORKER_COUNT:-2}
     restart: unless-stopped
 
+  web:
+    build: .
+    env_file:
+      - .env       # loads OPENWEATHER_API_KEY (and any other vars)
+    volumes:
+      - ./uploads:/app/uploads   # so your app.py / weather_service can write/read
+      - .:/app                   # if you want code auto-reloads in dev
+    command: flask run --host=0.0.0.0
+    ports:
+      - "5000:5000"
+    depends_on:
+      - redis
+      - api
+      - worker
+
 volumes:
   redis-data:
