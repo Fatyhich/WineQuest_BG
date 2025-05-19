@@ -3,6 +3,7 @@ import time
 from celery import Celery, states
 from celery.exceptions import Ignore
 from config import Config
+from weather_service import get_current_weather
 
 # Initialize Celery
 celery_app = Celery(
@@ -34,6 +35,16 @@ def process_image_task(self, job_id, image_path, text):
         # Mark the task as started
         self.update_state(state=states.STARTED, meta={'status': 'Task started'})
         
+        # Fetch current weather for Moscow
+        weather_info = get_current_weather('Moscow')
+
+        # Compose weather summary text
+        weather_text = (
+            f"Current weather in Moscow: {weather_info['description']}, "
+            f"temp {weather_info['temperature']}°C (feels like {weather_info['feels_like']}°C), "
+            f"humidity {weather_info['humidity']}%, wind {weather_info['wind_speed']} m/s."
+        )
+
         # Simulate a time-consuming task (e.g., running VLM and LLM models)
         # This would be replaced with actual model inference in production
         processing_time = 10  # seconds
@@ -52,6 +63,7 @@ def process_image_task(self, job_id, image_path, text):
             'text_analyzed': True,
             'text_input': text,
             'image_path': image_path,
+            'weather': weather_info,
             'mock_vlm_output': f"VLM analysis results for image {os.path.basename(image_path)}",
             'mock_llm_output': f"LLM analysis results for text: '{text}'"
         }
