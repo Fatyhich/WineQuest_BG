@@ -5,7 +5,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from celery.result import AsyncResult
 from celery import states
-from celery_worker import process_image_task, celery_app
+from celery_worker import process_query_task, celery_app
 from config import Config
 import redis
 
@@ -39,27 +39,34 @@ def process_image():
     Returns a job_id that can be used to check the status.
     """
     # Check if request has the required data
-    if 'image' not in request.files or 'text' not in request.form:
-        return jsonify({"error": "Missing image or text"}), 400
-    
-    image = request.files['image']
-    text = request.form['text']
+    if 'audio' in request.files:
+        audio = request.files['audio']
+        questionnaire = None
+    elif 'questionnaire' in request.form:
+        questionnaire = request.form['questionnaire']
+        audio = None
+    else:
+        return jsonify({"error": "Missing audio or questionnaire"}), 400
     
     # Generate a unique job ID
     job_id = str(uuid.uuid4())
     
-    # Save the image temporarily
-    image_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{job_id}_{image.filename}")
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    image.save(image_path)
+    # Save the audio temporarily
+    if audio is not None:
+        audio_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{job_id}_{audio.filename}")
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+        audio.save(audio_path)
+    else:
+        audio_path = None
     
     # Send the task to Celery workers
-    task = process_image_task.apply_async(args=[job_id, image_path, text], task_id=job_id)
+    task = process_query_task.apply_async(args=[job_id, audio_path, questionnaire], task_id=job_id)
     
     return jsonify({
         "job_id": job_id,
         "status": "processing"
     }), 202
+
 
 @app.route('/api/status/<job_id>', methods=['GET'])
 def get_job_status(job_id):
@@ -125,4 +132,4 @@ def get_job_status(job_id):
         })
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=Config.DEBUG) 
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=Config.DEBUG)

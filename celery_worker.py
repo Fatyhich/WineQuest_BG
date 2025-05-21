@@ -24,55 +24,74 @@ celery_app.conf.update(
     worker_max_tasks_per_child=200,  # Restart workers after 200 tasks
 )
 
-@celery_app.task(bind=True, name='process_image_task')
-def process_image_task(self, job_id, image_path, text):
+
+def speech_to_text(audio_path: str) -> str:
+    time.sleep(3)
+    return "Hello, world!"
+
+
+def process_questionnaire(questionnaire: str) -> str:
+    return "Hello, world!"
+
+
+def prepare_query(user_text: str,
+                  mode: str) -> str:
+    return "Hello, world!"
+
+
+def query_rag(query: str) -> str:
+    time.sleep(4)
+    return "Hello, world!"
+
+
+@celery_app.task(bind=True, name='process_query_task')
+def process_query_task(self, job_id, audio_path, questionnaire):
     """
-    Process an image and text.
+    Process an audio and questionnaire.
     This is a stub function that simulates a long-running task.
     In a real implementation, this would call a VLM and LLM to process the data.
     """
     try:
         # Mark the task as started
         self.update_state(state=states.STARTED, meta={'status': 'Task started'})
-        
-        # Fetch current weather for Moscow
-        weather_info = get_current_weather('Moscow')
+    
+        n_steps = 2
 
-        # Compose weather summary text
-        weather_text = (
-            f"Current weather in Moscow: {weather_info['description']}, "
-            f"temp {weather_info['temperature']}°C (feels like {weather_info['feels_like']}°C), "
-            f"humidity {weather_info['humidity']}%, wind {weather_info['wind_speed']} m/s."
-        )
-
-        # Simulate a time-consuming task (e.g., running VLM and LLM models)
-        # This would be replaced with actual model inference in production
-        processing_time = 10  # seconds
-        for i in range(processing_time):
-            time.sleep(1)
-            # Update progress information
-            self.update_state(
+        self.update_state(
                 state='PROCESSING',
-                meta={'current': i, 'total': processing_time, 'status': f'Processing step {i+1}/{processing_time}'}
+                meta={'current': 1, 
+                      'total': n_steps, 
+                      'status': f'Processing input (step 1/{n_steps})'}
             )
+        if audio_path is not None:
+            user_text = speech_to_text(audio_path)
+            mode = "audio"
+        else:
+            user_text = process_questionnaire(questionnaire)
+            mode = "questionnaire"
+
+        self.update_state(
+                state='PROCESSING',
+                meta={'current': 2, 
+                      'total': n_steps, 
+                      'status': f'Querying catalogue (step 2/{n_steps})'}
+            )
+        query = prepare_query(user_text, mode)
+        rag_response = query_rag(query)
         
         # Simulate getting results from models
         result = {
             'job_id': job_id,
-            'image_processed': True,
-            'text_analyzed': True,
-            'text_input': text,
-            'image_path': image_path,
-            'weather': weather_info,
-            'mock_vlm_output': f"VLM analysis results for image {os.path.basename(image_path)}",
-            'mock_llm_output': f"LLM analysis results for text: '{text}'"
+            "rag_response": rag_response
         }
         
         # In a real implementation, you might want to clean up the temporary image file
-        # os.remove(image_path)
+        if audio_path is not None:
+            os.remove(audio_path)
         
         # The task will automatically transition to SUCCESS state when it returns
         return result
+    
     except Exception as e:
         # If an exception occurs, mark the task as failed
         self.update_state(
@@ -80,3 +99,62 @@ def process_image_task(self, job_id, image_path, text):
             meta={'exc_type': type(e).__name__, 'exc_message': str(e)}
         )
         raise Ignore() 
+
+
+
+# @celery_app.task(bind=True, name='process_image_task')
+# def process_image_task(self, job_id, audio_path, questionnaire):
+#     """
+#     Process an audio and questionnaire.
+#     This is a stub function that simulates a long-running task.
+#     In a real implementation, this would call a VLM and LLM to process the data.
+#     """
+#     try:
+#         # Mark the task as started
+#         self.update_state(state=states.STARTED, meta={'status': 'Task started'})
+        
+#         # Fetch current weather for Moscow
+#         weather_info = get_current_weather('Moscow')
+
+#         # Compose weather summary text
+#         weather_text = (
+#             f"Current weather in Moscow: {weather_info['description']}, "
+#             f"temp {weather_info['temperature']}°C (feels like {weather_info['feels_like']}°C), "
+#             f"humidity {weather_info['humidity']}%, wind {weather_info['wind_speed']} m/s."
+#         )
+
+#         # Simulate a time-consuming task (e.g., running VLM and LLM models)
+#         # This would be replaced with actual model inference in production
+#         processing_time = 10  # seconds
+#         for i in range(processing_time):
+#             time.sleep(1)
+#             # Update progress information
+#             self.update_state(
+#                 state='PROCESSING',
+#                 meta={'current': i, 'total': processing_time, 'status': f'Processing step {i+1}/{processing_time}'}
+#             )
+        
+#         # Simulate getting results from models
+#         result = {
+#             'job_id': job_id,
+#             'image_processed': True,
+#             'text_analyzed': True,
+#             'text_input': text,
+#             'image_path': image_path,
+#             'weather': weather_info,
+#             'mock_vlm_output': f"VLM analysis results for image {os.path.basename(image_path)}",
+#             'mock_llm_output': f"LLM analysis results for text: '{text}'"
+#         }
+        
+#         # In a real implementation, you might want to clean up the temporary image file
+#         # os.remove(image_path)
+        
+#         # The task will automatically transition to SUCCESS state when it returns
+#         return result
+#     except Exception as e:
+#         # If an exception occurs, mark the task as failed
+#         self.update_state(
+#             state=states.FAILURE,
+#             meta={'exc_type': type(e).__name__, 'exc_message': str(e)}
+#         )
+#         raise Ignore() 
