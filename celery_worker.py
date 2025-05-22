@@ -4,6 +4,8 @@ from celery import Celery, states
 from celery.exceptions import Ignore
 from config import Config
 from weather_service import get_current_weather
+from stt_service import STTService
+
 
 # Initialize Celery
 celery_app = Celery(
@@ -14,6 +16,7 @@ celery_app = Celery(
 
 celery_app.conf.update(
     worker_prefetch_multiplier=1,
+    worker_concurrency=1,
     task_acks_late=True,
     task_track_started=True,
     task_serializer='json',
@@ -23,11 +26,6 @@ celery_app.conf.update(
     result_expires=3600 * 24,  # Results expire after 24 hours
     worker_max_tasks_per_child=200,  # Restart workers after 200 tasks
 )
-
-
-def speech_to_text(audio_path: str) -> str:
-    time.sleep(3)
-    return "Hello, world!"
 
 
 def process_questionnaire(questionnaire: str) -> str:
@@ -52,6 +50,9 @@ def process_query_task(self, job_id, audio_path, questionnaire):
     In a real implementation, this would call a VLM and LLM to process the data.
     """
     try:
+        # Initialize STT service only when needed
+        stt_service = STTService()
+        
         # Mark the task as started
         self.update_state(state=states.STARTED, meta={'status': 'Task started'})
     
@@ -64,7 +65,7 @@ def process_query_task(self, job_id, audio_path, questionnaire):
                       'status': f'Processing input (step 1/{n_steps})'}
             )
         if audio_path is not None:
-            user_text = speech_to_text(audio_path)
+            user_text = stt_service.transcribe(audio_path)
             mode = "audio"
         else:
             user_text = process_questionnaire(questionnaire)
