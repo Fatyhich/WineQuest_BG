@@ -1,3 +1,4 @@
+import torch
 import gigaam
 
 
@@ -8,5 +9,6 @@ class STTService:
                                         device="cuda")
 
     def transcribe(self, audio_path: str) -> str:
-        transcription = self._model.transcribe(audio_path)
+        with torch.inference_mode():
+            transcription = self._model.transcribe(audio_path)
         return transcription

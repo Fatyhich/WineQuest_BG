@@ -5,6 +5,7 @@ from celery.exceptions import Ignore
 from config import Config
 from weather_service import get_current_weather
 from stt_service import STTService
+from recommender_service import RecommenderService
 
 
 # Initialize Celery
@@ -28,6 +29,10 @@ celery_app.conf.update(
 )
 
 
+stt_service = None
+recommender_service = None
+
+
 def process_questionnaire(questionnaire: str) -> str:
     return "Hello, world!"
 
@@ -49,10 +54,14 @@ def process_query_task(self, job_id, audio_path, questionnaire):
     This is a stub function that simulates a long-running task.
     In a real implementation, this would call a VLM and LLM to process the data.
     """
+    global stt_service, recommender_service
     try:
         # Initialize STT service only when needed
-        stt_service = STTService()
-        
+        if stt_service is None:
+            stt_service = STTService()
+        if recommender_service is None:
+            recommender_service = RecommenderService()
+
         # Mark the task as started
         self.update_state(state=states.STARTED, meta={'status': 'Task started'})
     
@@ -77,8 +86,11 @@ def process_query_task(self, job_id, audio_path, questionnaire):
                       'total': n_steps, 
                       'status': f'Querying catalogue (step 2/{n_steps})'}
             )
-        query = prepare_query(user_text, mode)
-        rag_response = query_rag(query)
+        
+        rag_response = recommender_service.recommend(user_text, mode)
+
+        # query = prepare_query(user_text, mode)
+        # rag_response = query_rag(query)
         
         # Simulate getting results from models
         result = {
